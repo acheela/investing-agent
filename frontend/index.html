@@ -1,0 +1,2172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Investing Agent</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #ffffff;
+      --text: #111111;
+      --text-secondary: #444444;
+      --text-tertiary: #888888;
+      --border: rgba(0,0,0,0.15);
+      --divider: rgba(0,0,0,0.08);
+      --hover-bg: #f7f7f7;
+      --card-border: rgba(0,0,0,0.18);
+      --font: -apple-system, "SF Pro Display", "Inter", sans-serif;
+      --radius: 14px;
+      --radius-sm: 8px;
+      --radius-pill: 100px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      font-size: 19px;
+      font-weight: 400;
+      letter-spacing: -0.1px;
+    }
+
+    /* ── Top Nav ── */
+    #topnav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--divider);
+      display: flex;
+      align-items: center;
+      padding: 0 32px;
+      height: 64px;
+      gap: 0;
+    }
+
+    .nav-logo {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.4px;
+      color: var(--text);
+      margin-right: 36px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+
+    .nav-logo-dot {
+      width: 8px;
+      height: 8px;
+      background: #1a1a1a;
+      border-radius: 50%;
+    }
+
+    .nav-tabs {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      flex: 1;
+      height: 100%;
+    }
+
+    .nav-tab {
+      position: relative;
+      display: flex;
+      align-items: center;
+      padding: 0 18px;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: color 0.2s;
+      user-select: none;
+      height: 100%;
+      white-space: nowrap;
+    }
+
+    .nav-tab:hover { color: var(--text); }
+
+    .nav-tab.active { color: var(--text); }
+
+    .nav-tab::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 18px;
+      right: 18px;
+      height: 2px;
+      background: var(--text);
+      border-radius: 2px 2px 0 0;
+      transform: scaleX(0);
+      transition: transform 0.2s ease;
+    }
+
+    .nav-tab.active::after { transform: scaleX(1); }
+
+    .nav-run-btn {
+      margin-left: auto;
+      background: #1a1a1a;
+      color: #fff;
+      border: none;
+      padding: 9px 20px;
+      border-radius: var(--radius-pill);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: var(--font);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      transition: opacity 0.15s, transform 0.12s;
+      white-space: nowrap;
+    }
+
+    .nav-run-btn:hover { opacity: 0.85; }
+    .nav-run-btn:active { transform: scale(0.97); }
+    .nav-run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .run-pulse {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #fff;
+      opacity: 0;
+    }
+
+    .nav-run-btn.running .run-pulse {
+      opacity: 1;
+      animation: pulse-ring 1.2s ease infinite;
+    }
+
+    @keyframes pulse-ring {
+      0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.6); }
+      70% { box-shadow: 0 0 0 6px rgba(255,255,255,0); }
+      100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+    }
+
+    /* ── Content ── */
+    #content {
+      max-width: 1020px;
+      margin: 0 auto;
+      padding: 40px 28px 80px;
+    }
+
+    #page-builder { zoom: 1.2; width: calc(100vw / 1.2); }
+    #page-builder .builder-layout { padding: 0 80px; }
+
+    /* When Builder tab is active, let #content go full width */
+    #content.builder-active {
+      max-width: 100%;
+      padding-left: 0;
+      padding-right: 0;
+    }
+
+    /* Spacious table cells for Builder left panel */
+    #page-builder .data-table td { padding: 18px 10px; }
+    #page-builder .data-table th { padding: 10px 10px 10px; }
+
+    /* ── Pages ── */
+    .page { display: none; animation: fadein 0.2s ease; }
+    .page.active { display: block; }
+
+    @keyframes fadein { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ── Skeleton ── */
+    .skeleton {
+      background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: 6px;
+    }
+
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+    /* ── Signal Cards ── */
+    .signal-card {
+      background: #fff;
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 8px;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .signal-card:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    }
+
+    .signal-top-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .ticker-badge {
+      background: #1a1a1a;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+    }
+
+    .dir-badge {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+    }
+
+    .dir-long { background: #e8f5e9; color: #1b5e20; }
+    .dir-short { background: #ffebee; color: #b71c1c; }
+    .dir-watch { background: #fff8e1; color: #e65100; }
+    .dir-avoid { background: #f5f5f5; color: #424242; }
+
+    .signal-source-label {
+      margin-left: auto;
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+
+    .conviction-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .conviction-track {
+      flex: 1;
+      height: 4px;
+      background: #f0f0f0;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .conviction-fill {
+      height: 100%;
+      background: #1a1a1a;
+      border-radius: 2px;
+      transition: width 0.5s ease;
+    }
+
+    .conviction-num {
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-variant-numeric: tabular-nums;
+      min-width: 28px;
+      text-align: right;
+    }
+
+    .signal-summary {
+      font-size: 16px;
+      line-height: 1.65;
+      color: var(--text);
+      font-weight: 400;
+      margin-bottom: 16px;
+    }
+
+    .lenses-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+
+    .lens-pill {
+      border: 1px solid var(--divider);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+
+    .lens-pill-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 12px;
+      cursor: pointer;
+      transition: background 0.15s;
+      user-select: none;
+    }
+
+    .lens-pill-header:hover { background: var(--hover-bg); }
+
+    .lens-avatar {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #f0f0f0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      flex-shrink: 0;
+    }
+
+    .lens-pill-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-secondary);
+    }
+
+    .lens-chevron {
+      margin-left: auto;
+      font-size: 10px;
+      color: var(--text-tertiary);
+      transition: transform 0.2s;
+    }
+
+    .lens-pill.open .lens-chevron { transform: rotate(180deg); }
+
+    .lens-pill-body {
+      display: none;
+      padding: 10px 12px 12px;
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text-secondary);
+      border-top: 1px solid var(--divider);
+    }
+
+    .lens-pill.open .lens-pill-body { display: block; }
+
+    .signal-footer {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .article-link {
+      font-size: 12px;
+      color: var(--text-tertiary);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .article-link:hover { color: var(--text-secondary); }
+
+    /* ── Articles ── */
+    .article-list { border: 1px solid var(--card-border); border-radius: var(--radius); overflow: hidden; }
+
+    .article-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--divider);
+      transition: background 0.15s;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .article-row:last-child { border-bottom: none; }
+    .article-row:hover { background: var(--hover-bg); }
+
+    .article-type-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #f0f0f0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      flex-shrink: 0;
+    }
+
+    .article-source-name {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-tertiary);
+      width: 130px;
+      flex-shrink: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .article-title {
+      flex: 1;
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .article-date {
+      font-size: 12px;
+      color: var(--text-tertiary);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .article-arrow {
+      font-size: 12px;
+      color: var(--text-tertiary);
+      flex-shrink: 0;
+    }
+
+    /* ── Portfolio ── */
+    .portfolio-stat-strip {
+      display: flex;
+      align-items: baseline;
+      gap: 40px;
+      padding: 28px 0 24px;
+      border-bottom: 1px solid var(--divider);
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+    }
+
+    .stat-main {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .stat-main-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-tertiary);
+    }
+
+    .stat-main-value {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.8px;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .stat-secondary {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .stat-secondary-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-tertiary);
+    }
+
+    .stat-secondary-value {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      letter-spacing: -0.3px;
+    }
+
+    .return-value {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .up { color: #1b5e20; }
+    .down { color: #b71c1c; }
+
+    .triangle-up::before { content: '▲'; font-size: 10px; }
+    .triangle-down::before { content: '▼'; font-size: 10px; }
+
+    /* Range pills */
+    .range-pills { display: flex; gap: 2px; }
+
+    .range-pill {
+      background: transparent;
+      border: none;
+      padding: 5px 9px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-tertiary);
+      cursor: pointer;
+      font-family: var(--font);
+      transition: background 0.12s, color 0.12s, transform 0.1s;
+    }
+
+    .range-pill:hover { background: var(--hover-bg); color: var(--text-secondary); }
+    .range-pill:active { transform: scale(0.95); }
+    .range-pill.active { background: #1a1a1a; color: #fff; }
+
+    /* Chart */
+    .chart-section { margin-bottom: 28px; }
+    .chart-section-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-tertiary);
+      margin-bottom: 12px;
+    }
+    .chart-wrap { height: 180px; position: relative; }
+
+    /* Trade panel */
+    .trade-section {
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      margin-bottom: 28px;
+    }
+
+    .trade-section-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .trade-fields {
+      display: flex;
+      align-items: flex-end;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .borderless-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .borderless-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-tertiary);
+    }
+
+    .borderless-input {
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid rgba(0,0,0,0.15);
+      padding: 6px 0;
+      font-size: 16px;
+      font-family: var(--font);
+      color: var(--text);
+      outline: none;
+      width: 120px;
+      transition: border-color 0.15s;
+    }
+
+    .borderless-input:focus { border-bottom-color: #1a1a1a; }
+    .borderless-input::placeholder { color: var(--text-tertiary); }
+
+    .trade-btns {
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+      padding-bottom: 2px;
+    }
+
+    .btn-black {
+      background: #1a1a1a;
+      color: #fff;
+      border: none;
+      padding: 9px 18px;
+      border-radius: var(--radius-pill);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: var(--font);
+      transition: opacity 0.15s, transform 0.12s;
+    }
+
+    .btn-black:hover { opacity: 0.8; }
+    .btn-black:active { transform: scale(0.97); }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid rgba(0,0,0,0.2);
+      padding: 9px 18px;
+      border-radius: var(--radius-pill);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: var(--font);
+      transition: background 0.15s, transform 0.12s;
+    }
+
+    .btn-outline:hover { background: var(--hover-bg); }
+    .btn-outline:active { transform: scale(0.97); }
+
+    .quote-strip {
+      display: none;
+      align-items: center;
+      gap: 14px;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--divider);
+      font-size: 13px;
+    }
+
+    .quote-strip.visible { display: flex; }
+
+    .quote-ticker-text { font-weight: 700; font-size: 15px; }
+    .quote-name-text { color: var(--text-secondary); }
+    .quote-price-text { font-size: 16px; font-weight: 600; }
+
+    /* Positions table */
+    .section-title {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 15px;
+    }
+
+    .data-table th {
+      text-align: left;
+      padding: 8px 0;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-tertiary);
+      border-bottom: 1px solid var(--divider);
+    }
+
+    .data-table th.right,
+    .data-table td.right { text-align: right; }
+
+    .data-table td {
+      padding: 14px 0;
+      border-bottom: 1px solid var(--divider);
+      vertical-align: middle;
+    }
+
+    .data-table tr:last-child td { border-bottom: none; }
+
+    .data-table tr:hover td { background: var(--hover-bg); }
+
+    .sell-text-btn {
+      background: none;
+      border: none;
+      color: #b71c1c;
+      font-size: 12px;
+      font-family: var(--font);
+      cursor: pointer;
+      padding: 0;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    .data-table tr:hover .sell-text-btn { opacity: 1; }
+
+    /* Sources */
+    .sources-add-section {
+      border-bottom: 1px solid var(--divider);
+      padding-bottom: 24px;
+      margin-bottom: 24px;
+    }
+
+    .sources-form-row {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      margin-bottom: 16px;
+    }
+
+    .sources-form-row-full {
+      display: flex;
+      gap: 16px;
+      align-items: flex-end;
+    }
+
+    .borderless-field-wide .borderless-input { width: 100%; }
+    .borderless-field-wide { flex: 1; }
+
+    .filter-pills {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 20px;
+    }
+
+    .filter-pill {
+      padding: 6px 14px;
+      border-radius: var(--radius-pill);
+      border: 1px solid rgba(0,0,0,0.15);
+      background: transparent;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-family: var(--font);
+      transition: all 0.15s;
+    }
+
+    .filter-pill:active { transform: scale(0.97); }
+    .filter-pill.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+    .filter-pill:not(.active):hover { background: var(--hover-bg); }
+
+    .source-list-wrap { border: 1px solid var(--card-border); border-radius: var(--radius); overflow: hidden; }
+
+    .source-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--divider);
+      transition: background 0.15s;
+    }
+
+    .source-row:last-child { border-bottom: none; }
+    .source-row:hover { background: var(--hover-bg); }
+
+    .source-type-dot {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #f0f0f0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      flex-shrink: 0;
+    }
+
+    .source-info { flex: 1; min-width: 0; }
+    .source-row-name { font-size: 16px; font-weight: 600; color: var(--text); }
+    .source-row-handle { font-size: 14px; color: var(--text-secondary); margin-top: 2px; }
+
+    /* iOS-style toggle */
+    .ios-toggle {
+      position: relative;
+      width: 40px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+
+    .ios-toggle input { opacity: 0; width: 0; height: 0; }
+
+    .ios-slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background: #d1d1d6;
+      border-radius: 12px;
+      transition: background 0.2s;
+    }
+
+    .ios-slider::before {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      left: 2px;
+      top: 2px;
+      background: white;
+      border-radius: 50%;
+      transition: transform 0.2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+
+    .ios-toggle input:checked + .ios-slider { background: #34c759; }
+    .ios-toggle input:checked + .ios-slider::before { transform: translateX(16px); }
+
+    .delete-x {
+      background: none;
+      border: none;
+      font-size: 16px;
+      color: var(--text-tertiary);
+      cursor: pointer;
+      padding: 4px;
+      opacity: 0;
+      transition: opacity 0.15s, color 0.15s;
+      font-family: var(--font);
+      line-height: 1;
+    }
+
+    .source-row:hover .delete-x { opacity: 1; }
+    .delete-x:hover { color: #b71c1c; }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-tertiary);
+    }
+
+    .empty-state h3 { font-size: 16px; font-weight: 500; color: var(--text-secondary); margin-bottom: 6px; }
+    .empty-state p { font-size: 14px; line-height: 1.6; }
+
+    /* Toast */
+    #toast {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #1a1a1a;
+      color: #fff;
+      border-radius: var(--radius-pill);
+      padding: 11px 20px;
+      font-size: 13px;
+      font-weight: 500;
+      z-index: 1000;
+      transition: transform 0.3s ease;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    #toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* Responsive */
+    @media (max-width: 700px) {
+      #topnav { padding: 0 16px; }
+      #content { padding: 24px 16px 60px; }
+      .lenses-grid { grid-template-columns: 1fr; }
+      .trade-fields { flex-direction: column; align-items: flex-start; }
+      .portfolio-stat-strip { gap: 24px; }
+    }
+
+    /* Builder two-column layout */
+    .builder-layout {
+      display: grid;
+      grid-template-columns: 1fr 1px 1fr;
+      gap: 0;
+      min-height: calc(100vh - 64px);
+      align-items: start;
+    }
+
+    .builder-col {
+      padding: 0 28px;
+      overflow-y: auto;
+    }
+
+    .builder-col-left { padding-left: 0; }
+    .builder-col-right { padding-right: 0; }
+
+    .builder-divider {
+      background: var(--divider);
+      align-self: stretch;
+    }
+
+    .builder-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      margin-top: 28px;
+    }
+
+    .builder-section-header:first-child { margin-top: 0; }
+
+    .builder-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-tertiary);
+    }
+
+    .builder-clear-link {
+      font-size: 12px;
+      color: var(--text-tertiary);
+      cursor: pointer;
+      background: none;
+      border: none;
+      font-family: var(--font);
+      padding: 0;
+    }
+
+    .builder-clear-link:hover { color: var(--text-secondary); text-decoration: underline; }
+
+    /* PDF upload zone */
+    .upload-zone {
+      border: 1px dashed #d0d0d0;
+      border-radius: 16px;
+      background: #f5f5f5;
+      height: 110px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      margin-bottom: 10px;
+    }
+
+    .upload-zone:hover { background: #efefef; border-color: #bbb; }
+    .upload-zone.drag-over { background: #e8f0fe; border-color: #4285f4; }
+
+    .upload-icon { font-size: 18px; color: var(--text-tertiary); }
+    .upload-text { font-size: 13px; color: var(--text-tertiary); }
+
+    /* YouTube input */
+    .yt-input-wrap {
+      display: flex;
+      align-items: center;
+      border: 1px solid #d0d0d0;
+      border-radius: 16px;
+      background: #fff;
+      padding: 0 14px;
+      height: 44px;
+      gap: 10px;
+      margin-bottom: 14px;
+      transition: border-color 0.15s;
+    }
+
+    .yt-input-wrap:focus-within { border-color: #aaa; }
+
+    .yt-icon { font-size: 16px; flex-shrink: 0; }
+
+    .yt-input {
+      flex: 1;
+      border: none;
+      outline: none;
+      font-size: 13px;
+      font-family: var(--font);
+      color: var(--text);
+      background: transparent;
+    }
+
+    .yt-input::placeholder { color: var(--text-tertiary); }
+
+    .yt-submit {
+      background: none;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
+      color: var(--text-tertiary);
+      padding: 0;
+      transition: color 0.15s;
+    }
+
+    .yt-submit:hover { color: var(--text); }
+
+    /* Builder run button */
+    .builder-run-btn {
+      width: 100%;
+      background: #1a1a1a;
+      color: #fff;
+      border: none;
+      padding: 12px 0;
+      border-radius: var(--radius-pill);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: var(--font);
+      margin-bottom: 20px;
+      transition: opacity 0.15s, transform 0.12s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .builder-run-btn:hover { opacity: 0.85; }
+    .builder-run-btn:active { transform: scale(0.98); }
+    .builder-run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .builder-run-btn.running {
+      background: linear-gradient(90deg, #1a1a1a 30%, #333 50%, #1a1a1a 70%);
+      background-size: 200% 100%;
+      animation: shimmer-dark 1.4s infinite;
+    }
+
+    @keyframes shimmer-dark { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+    /* Source list */
+    .builder-source-list { margin-bottom: 8px; }
+
+    .builder-source-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      height: 40px;
+      border-bottom: 0.5px solid var(--divider);
+      transition: background 0.12s;
+    }
+
+    .builder-source-row:last-child { border-bottom: none; }
+    .builder-source-row:hover { background: var(--hover-bg); }
+
+    .builder-checkbox {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      border: 1.5px solid #ccc;
+      cursor: pointer;
+      flex-shrink: 0;
+      accent-color: #1a1a1a;
+    }
+
+    .builder-source-icon { font-size: 14px; color: var(--text-tertiary); flex-shrink: 0; }
+
+    .builder-source-name {
+      flex: 1;
+      font-size: 14px;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: opacity 0.15s;
+    }
+
+    .builder-source-row.unchecked .builder-source-name { opacity: 0.4; }
+
+    .builder-source-delete {
+      background: none;
+      border: none;
+      color: var(--text-tertiary);
+      font-size: 15px;
+      cursor: pointer;
+      padding: 0 2px;
+      opacity: 0;
+      transition: opacity 0.12s, color 0.12s;
+      font-family: var(--font);
+      line-height: 1;
+    }
+
+    .builder-source-row:hover .builder-source-delete { opacity: 1; }
+    .builder-source-delete:hover { color: #b71c1c; }
+
+    /* Ideas */
+    .idea-row {
+      border-bottom: 0.5px solid var(--divider);
+    }
+
+    .idea-row:last-child { border-bottom: none; }
+
+    .idea-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      height: 44px;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+
+    .idea-header:hover { background: var(--hover-bg); }
+
+    .idea-chevron {
+      font-size: 13px;
+      color: var(--text-tertiary);
+      transition: transform 0.15s ease;
+      flex-shrink: 0;
+      width: 16px;
+    }
+
+    .idea-row.open .idea-chevron { transform: rotate(90deg); }
+
+    .idea-title {
+      flex: 1;
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .idea-count-badge {
+      font-size: 12px;
+      background: #f0f0f0;
+      color: var(--text-secondary);
+      padding: 3px 9px;
+      border-radius: var(--radius-pill);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .idea-body {
+      display: none;
+      padding: 0 0 14px 26px;
+    }
+
+    .idea-row.open .idea-body { display: block; }
+
+    .idea-thesis {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin-bottom: 12px;
+    }
+
+    .idea-stock-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 0;
+      border-top: 0.5px solid var(--divider);
+    }
+
+    .idea-stock-ticker {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      min-width: 52px;
+    }
+
+    .idea-stock-name {
+      font-size: 13px;
+      color: var(--text-secondary);
+      flex: 1;
+    }
+
+    .select-btn {
+      background: transparent;
+      border: 1px solid #1a1a1a;
+      color: #1a1a1a;
+      padding: 5px 12px;
+      border-radius: var(--radius-pill);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: var(--font);
+      transition: background 0.12s, color 0.12s, transform 0.1s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .select-btn:hover { background: #1a1a1a; color: #fff; }
+    .select-btn:active { transform: scale(0.96); }
+
+    /* Trade flash highlight */
+    @keyframes trade-flash {
+      0% { background: #fffde7; }
+      100% { background: transparent; }
+    }
+
+    .trade-flash { animation: trade-flash 0.6s ease forwards; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #e0e0e0; border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<!-- Top Nav -->
+<nav id="topnav">
+  <div class="nav-logo">
+    <div class="nav-logo-dot"></div>
+    Investing Agent
+  </div>
+  <div class="nav-tabs">
+    <div class="nav-tab active" onclick="showPage('signals', this)">Signals</div>
+    <div class="nav-tab" onclick="showPage('articles', this)">Articles</div>
+    <div class="nav-tab" onclick="showPage('portfolio', this)">Portfolio</div>
+    <div class="nav-tab" onclick="showPage('sources', this)">Sources</div>
+    <div class="nav-tab" onclick="showPage('builder', this)">Builder</div>
+  </div>
+  <button class="nav-run-btn" id="runBtn" onclick="runAnalysis()">
+    <div class="run-pulse" id="runPulse"></div>
+    <span id="runBtnText">Run Analysis</span>
+  </button>
+</nav>
+
+<!-- Content -->
+<div id="content">
+
+  <!-- Signals -->
+  <div class="page active" id="page-signals">
+    <div id="signalsList"></div>
+  </div>
+
+  <!-- Articles -->
+  <div class="page" id="page-articles">
+    <div id="articlesList"></div>
+  </div>
+
+  <!-- Portfolio -->
+  <div class="page" id="page-portfolio" style="zoom:1.2">
+    <div class="portfolio-stat-strip" id="portfolioStats"></div>
+
+    <div class="chart-section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div class="chart-section-label" style="margin-bottom:0">Portfolio Value</div>
+        <div class="range-pills" id="rangePills">
+          <button class="range-pill" onclick="setRange('1d',this)">1D</button>
+          <button class="range-pill" onclick="setRange('1w',this)">1W</button>
+          <button class="range-pill" onclick="setRange('1m',this)">1M</button>
+          <button class="range-pill active" onclick="setRange('3m',this)">3M</button>
+          <button class="range-pill" onclick="setRange('6m',this)">6M</button>
+          <button class="range-pill" onclick="setRange('ytd',this)">YTD</button>
+          <button class="range-pill" onclick="setRange('1y',this)">1Y</button>
+          <button class="range-pill" onclick="setRange('5y',this)">5Y</button>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="portfolioChart"></canvas></div>
+    </div>
+
+    <div class="trade-section">
+      <div class="trade-section-title">Trade</div>
+      <div class="trade-fields">
+        <div class="borderless-field">
+          <div class="borderless-label">Ticker</div>
+          <input class="borderless-input" id="tradeTickerInput" type="text" placeholder="AAPL"
+            style="text-transform:uppercase;width:90px" oninput="this.value=this.value.toUpperCase()" />
+        </div>
+        <div class="borderless-field">
+          <div class="borderless-label">Amount (USD)</div>
+          <input class="borderless-input" id="tradeAmount" type="number" placeholder="100" min="1" style="width:110px" />
+        </div>
+        <div class="trade-btns">
+          <button class="btn-outline" onclick="lookupQuote()">Look Up</button>
+          <button class="btn-black" onclick="placeBuy()">Buy</button>
+          <button class="btn-outline" onclick="placeSell()">Sell $</button>
+        </div>
+      </div>
+      <div class="quote-strip" id="quoteResult">
+        <span class="quote-ticker-text" id="qTicker"></span>
+        <span class="quote-name-text" id="qName"></span>
+        <span class="quote-price-text" id="qPrice"></span>
+        <span id="qChange"></span>
+      </div>
+    </div>
+
+    <div style="margin-bottom:28px">
+      <div class="section-title">Positions</div>
+      <div id="positionsContent"></div>
+    </div>
+
+    <div>
+      <div class="section-title">Transaction History</div>
+      <div id="txnContent"></div>
+    </div>
+  </div>
+
+  <!-- Builder -->
+  <div class="page" id="page-builder">
+    <div class="builder-layout">
+
+      <!-- Left: Portfolio -->
+      <div class="builder-col builder-col-left">
+        <div class="portfolio-stat-strip" id="b-portfolioStats"></div>
+        <div class="chart-section">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+            <div class="chart-section-label" style="margin-bottom:0">Portfolio Value</div>
+            <div class="range-pills" id="b-rangePills">
+              <button class="range-pill" onclick="bSetRange('1d',this)">1D</button>
+              <button class="range-pill" onclick="bSetRange('1w',this)">1W</button>
+              <button class="range-pill" onclick="bSetRange('1m',this)">1M</button>
+              <button class="range-pill active" onclick="bSetRange('3m',this)">3M</button>
+              <button class="range-pill" onclick="bSetRange('6m',this)">6M</button>
+              <button class="range-pill" onclick="bSetRange('ytd',this)">YTD</button>
+              <button class="range-pill" onclick="bSetRange('1y',this)">1Y</button>
+              <button class="range-pill" onclick="bSetRange('5y',this)">5Y</button>
+            </div>
+          </div>
+          <div class="chart-wrap"><canvas id="b-portfolioChart"></canvas></div>
+        </div>
+        <div class="trade-section" id="b-tradeSection">
+          <div class="trade-section-title">Trade</div>
+          <div class="trade-fields">
+            <div class="borderless-field">
+              <div class="borderless-label">Ticker</div>
+              <input class="borderless-input" id="b-tradeTickerInput" type="text" placeholder="AAPL"
+                style="text-transform:uppercase;width:90px" oninput="this.value=this.value.toUpperCase()" />
+            </div>
+            <div class="borderless-field">
+              <div class="borderless-label">Amount (USD)</div>
+              <input class="borderless-input" id="b-tradeAmount" type="number" placeholder="100" min="1" style="width:110px" />
+            </div>
+            <div class="trade-btns">
+              <button class="btn-outline" onclick="bLookupQuote()">Look Up</button>
+              <button class="btn-black" onclick="bPlaceBuy()">Buy</button>
+              <button class="btn-outline" onclick="bPlaceSell()">Sell $</button>
+            </div>
+          </div>
+          <div class="quote-strip" id="b-quoteResult">
+            <span class="quote-ticker-text" id="b-qTicker"></span>
+            <span class="quote-name-text" id="b-qName"></span>
+            <span class="quote-price-text" id="b-qPrice"></span>
+            <span id="b-qChange"></span>
+          </div>
+        </div>
+        <div style="margin-bottom:28px">
+          <div class="section-title">Positions</div>
+          <div id="b-positionsContent"></div>
+        </div>
+        <div>
+          <div class="section-title">Transaction History</div>
+          <div id="b-txnContent"></div>
+        </div>
+      </div>
+
+      <!-- Divider -->
+      <div class="builder-divider"></div>
+
+      <!-- Right: Intelligence -->
+      <div class="builder-col builder-col-right">
+
+        <!-- PDF Upload -->
+        <div class="builder-section-header" style="margin-top:0">
+          <div class="builder-label">Upload Research</div>
+        </div>
+
+        <div class="upload-zone" id="pdfDropZone"
+          onclick="document.getElementById('pdfFileInput').click()"
+          ondragover="event.preventDefault();this.classList.add('drag-over')"
+          ondragleave="this.classList.remove('drag-over')"
+          ondrop="handlePdfDrop(event)">
+          <div class="upload-icon">📄</div>
+          <div class="upload-text">Drop PDFs or click to upload</div>
+        </div>
+        <input type="file" id="pdfFileInput" accept=".pdf" multiple style="display:none" onchange="handlePdfSelect(event)" />
+
+        <div class="yt-input-wrap">
+          <span class="yt-icon">▶</span>
+          <input class="yt-input" id="ytLinkInput" type="text" placeholder="Paste YouTube link..."
+            onkeydown="if(event.key==='Enter') addYouTubeLink()" />
+          <button class="yt-submit" onclick="addYouTubeLink()">→</button>
+        </div>
+
+        <button class="builder-run-btn" id="builderRunBtn" onclick="runBuilderAnalysis()">Run Analysis</button>
+
+        <!-- Sources list -->
+        <div id="builderSourcesSection" style="display:none">
+          <div class="builder-section-header">
+            <div class="builder-label">Sources</div>
+            <button class="builder-clear-link" onclick="clearBuilderSources()">Clear all</button>
+          </div>
+          <div class="builder-source-list" id="builderSourceList"></div>
+        </div>
+
+        <!-- Ideas -->
+        <div id="builderIdeasSection" style="display:none;margin-top:24px">
+          <div class="builder-section-header">
+            <div class="builder-label">Ideas</div>
+          </div>
+          <div id="builderIdeasList"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Sources -->
+  <div class="page" id="page-sources">
+    <div class="sources-add-section">
+      <div class="sources-form-row">
+        <div class="borderless-field">
+          <div class="borderless-label">Type</div>
+          <select class="borderless-input" id="newType" style="width:130px;cursor:pointer">
+            <option value="substack">Substack</option>
+            <option value="twitter">X / Twitter</option>
+            <option value="youtube">YouTube</option>
+          </select>
+        </div>
+        <div class="borderless-field">
+          <div class="borderless-label">Name</div>
+          <input class="borderless-input" id="newName" type="text" placeholder="Citrini Research" style="width:180px" />
+        </div>
+        <div class="borderless-field">
+          <div class="borderless-label">Handle</div>
+          <input class="borderless-input" id="newHandle" type="text" placeholder="citriniresearch" style="width:160px" />
+        </div>
+      </div>
+      <div class="sources-form-row-full">
+        <div class="borderless-field borderless-field-wide">
+          <div class="borderless-label">Feed URL</div>
+          <input class="borderless-input" id="newUrl" type="text" placeholder="https://citriniresearch.substack.com/feed" />
+        </div>
+        <button class="btn-black" style="margin-bottom:2px" onclick="addSource()">Add Source</button>
+      </div>
+    </div>
+
+    <div class="filter-pills">
+      <button class="filter-pill active" onclick="filterSources('all', this)">All</button>
+      <button class="filter-pill" onclick="filterSources('substack', this)">Substack</button>
+      <button class="filter-pill" onclick="filterSources('twitter', this)">X / Twitter</button>
+      <button class="filter-pill" onclick="filterSources('youtube', this)">YouTube</button>
+    </div>
+
+    <div class="source-list-wrap" id="sourceList"></div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+  let allSources = [];
+  let currentFilter = 'all';
+  let portfolioChartInstance = null;
+  let currentRange = '3m';
+
+  // ── Navigation ──
+  function showPage(name, el) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('page-' + name).classList.add('active');
+    el.classList.add('active');
+    document.getElementById('content').classList.toggle('builder-active', name === 'builder');
+    if (name === 'signals') loadSignals();
+    if (name === 'articles') loadArticles();
+    if (name === 'portfolio') loadPortfolio();
+    if (name === 'sources') loadSources();
+    if (name === 'builder') loadBuilder();
+  }
+
+  // ── Toast ──
+  function toast(msg, duration = 3000) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), duration);
+  }
+
+  // ── Run Analysis ──
+  async function runAnalysis() {
+    const btn = document.getElementById('runBtn');
+    const txt = document.getElementById('runBtnText');
+    btn.disabled = true;
+    btn.classList.add('running');
+    txt.textContent = 'Running…';
+    try {
+      const res = await fetch('/api/run', { method: 'POST' });
+      const data = await res.json();
+      toast('✓ ' + data.message);
+      loadSignals();
+    } catch (e) {
+      toast('Error: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.classList.remove('running');
+      txt.textContent = 'Run Analysis';
+    }
+  }
+
+  // ── Signals ──
+  async function loadSignals() {
+    const el = document.getElementById('signalsList');
+    el.innerHTML = skeletonCards(3);
+    const res = await fetch('/api/signals');
+    const signals = await res.json();
+    if (!signals.length) {
+      el.innerHTML = `<div class="empty-state"><h3>No signals yet</h3><p>Click "Run Analysis" to fetch the latest content from your sources and generate investment signals.</p></div>`;
+      return;
+    }
+    el.innerHTML = signals.map(s => signalCard(s)).join('');
+  }
+
+  function signalCard(s) {
+    const dirMap = { long: ['dir-long','Long'], short: ['dir-short','Short'], watch: ['dir-watch','Watch'], avoid: ['dir-avoid','Avoid'] };
+    const [dirClass, dirLabel] = dirMap[s.direction] || ['dir-avoid','-'];
+    const conviction = parseFloat(s.conviction_score || 5).toFixed(1);
+    const convPct = Math.round(parseFloat(conviction) * 10);
+    const lenses = [
+      ['B', 'Buffett', s.buffett_take],
+      ['G', 'Greenblatt', s.greenblatt_take],
+      ['S', 'Soros', s.soros_take],
+      ['Q', 'Simons', s.simons_take],
+    ];
+    return `
+      <div class="signal-card">
+        <div class="signal-top-row">
+          <span class="ticker-badge">${esc(s.ticker)}</span>
+          <span class="dir-badge ${dirClass}">${dirLabel}</span>
+          <span class="signal-source-label">${esc(s.source_name)}</span>
+        </div>
+        <div class="conviction-row">
+          <div class="conviction-track"><div class="conviction-fill" style="width:${convPct}%"></div></div>
+          <span class="conviction-num">${conviction}</span>
+        </div>
+        <div class="signal-summary">${esc(s.summary)}</div>
+        <div class="lenses-grid">
+          ${lenses.map(([letter, name, text]) => `
+            <div class="lens-pill" onclick="toggleLens(this)">
+              <div class="lens-pill-header">
+                <div class="lens-avatar">${letter}</div>
+                <span class="lens-pill-name">${name}</span>
+                <span class="lens-chevron">▾</span>
+              </div>
+              <div class="lens-pill-body">${esc(text || '-')}</div>
+            </div>`).join('')}
+        </div>
+        <div class="signal-footer">
+          <a class="article-link" href="${esc(s.article_url)}" target="_blank">${esc(s.article_title || 'View source')}</a>
+        </div>
+      </div>`;
+  }
+
+  function toggleLens(pill) {
+    pill.classList.toggle('open');
+  }
+
+  // ── Articles ──
+  async function loadArticles() {
+    const el = document.getElementById('articlesList');
+    el.innerHTML = skeletonRows(5);
+    const res = await fetch('/api/articles');
+    const articles = await res.json();
+    if (!articles.length) {
+      el.innerHTML = `<div class="empty-state"><h3>No articles yet</h3><p>Run analysis to pull content from your sources.</p></div>`;
+      return;
+    }
+    const typeLetters = { substack: 'S', twitter: 'X', youtube: 'Y' };
+    el.innerHTML = `<div class="article-list">${articles.map(a => `
+      <a class="article-row" href="${esc(a.url)}" target="_blank">
+        <div class="article-type-icon">${typeLetters[a.source_type] || '?'}</div>
+        <div class="article-source-name">${esc(a.source_name)}</div>
+        <div class="article-title">${esc(a.title)}</div>
+        <div class="article-date">${a.published_at?.slice(0,10) || ''}</div>
+        <div class="article-arrow">↗</div>
+      </a>`).join('')}</div>`;
+  }
+
+  // ── Portfolio ──
+  async function loadPortfolio() {
+    const [state, chartData, txns] = await Promise.all([
+      fetch('/api/portfolio').then(r => r.json()),
+      fetch(`/api/portfolio/chart?range=${currentRange}`).then(r => r.json()),
+      fetch('/api/portfolio/transactions').then(r => r.json()),
+    ]);
+    renderStatStrip(state);
+    renderPortfolioChart(chartData);
+    renderPositions(state.positions);
+    renderTransactions(txns);
+  }
+
+  async function setRange(range, el) {
+    currentRange = range;
+    document.querySelectorAll('.range-pill').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+    const chartData = await fetch(`/api/portfolio/chart?range=${range}`).then(r => r.json());
+    renderPortfolioChart(chartData);
+  }
+
+  function renderStatStrip(s) {
+    const up = s.total_return_pct >= 0;
+    const retColor = up ? 'up' : 'down';
+    const triClass = up ? 'triangle-up' : 'triangle-down';
+    const sign = up ? '+' : '';
+    document.getElementById('portfolioStats').innerHTML = `
+      <div class="stat-main">
+        <div class="stat-main-label">Total Value</div>
+        <div class="stat-main-value">$${s.total_value.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+      </div>
+      <div class="stat-secondary">
+        <div class="stat-secondary-label">Return</div>
+        <div class="return-value ${retColor}"><span class="${triClass}"></span>${sign}${s.total_return_pct}%</div>
+      </div>
+      <div class="stat-secondary">
+        <div class="stat-secondary-label">Cash</div>
+        <div class="stat-secondary-value">$${s.cash.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+      </div>
+      <div class="stat-secondary">
+        <div class="stat-secondary-label">Invested</div>
+        <div class="stat-secondary-value">$${s.positions_value.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+      </div>`;
+  }
+
+  function renderPortfolioChart(data) {
+    const ctx = document.getElementById('portfolioChart').getContext('2d');
+    if (portfolioChartInstance) portfolioChartInstance.destroy();
+    const isUp = data.values.length < 2 || data.values[data.values.length-1] >= data.values[0];
+    const lineColor = isUp ? '#1b5e20' : '#b71c1c';
+    const fillColor = isUp ? 'rgba(27,94,32,0.05)' : 'rgba(183,28,28,0.05)';
+    portfolioChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: data.labels,
+        datasets: [{
+          data: data.values,
+          borderColor: lineColor,
+          backgroundColor: fillColor,
+          borderWidth: 1.5,
+          fill: true,
+          tension: 0.4,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          pointBackgroundColor: lineColor,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => '$' + ctx.parsed.y.toLocaleString('en-US',{minimumFractionDigits:2})
+            },
+            displayColors: false,
+            backgroundColor: '#1a1a1a',
+            titleFont: { size: 11 },
+            bodyFont: { size: 13, weight: '600' },
+            padding: 10,
+            cornerRadius: 8,
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            border: { display: false },
+            ticks: {
+              color: '#9b9b9b',
+              maxTicksLimit: 5,
+              font: { size: 11 },
+              maxRotation: 0,
+            }
+          },
+          y: {
+            grid: { display: false },
+            border: { display: false },
+            ticks: {
+              color: '#9b9b9b',
+              font: { size: 11 },
+              maxTicksLimit: 4,
+              callback: v => '$' + v.toFixed(0)
+            },
+            position: 'right',
+          }
+        }
+      }
+    });
+  }
+
+  function renderPositions(positions) {
+    const el = document.getElementById('positionsContent');
+    if (!positions.length) {
+      el.innerHTML = `<div style="color:var(--text-tertiary);font-size:14px;padding:16px 0">No open positions. Use the trade panel to buy your first stock.</div>`;
+      return;
+    }
+    el.innerHTML = `<table class="data-table">
+      <thead><tr>
+        <th>Ticker</th><th>Shares</th><th>Avg Cost</th>
+        <th class="right">Price</th><th class="right">Value</th><th class="right">Gain/Loss</th><th class="right">Today</th><th></th>
+      </tr></thead>
+      <tbody>
+      ${positions.map(p => {
+        const gc = p.gain >= 0 ? 'up' : 'down';
+        const dc = p.change_pct >= 0 ? 'up' : 'down';
+        return `<tr>
+          <td><strong>${esc(p.ticker)}</strong><br><span style="font-size:12px;color:var(--text-tertiary)">${esc(p.name)}</span></td>
+          <td>${p.shares.toFixed(4)}</td>
+          <td>$${p.avg_cost.toFixed(2)}</td>
+          <td class="right">$${p.current_price.toFixed(2)}</td>
+          <td class="right" style="font-weight:600">$${p.market_value.toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+          <td class="right ${gc}">${p.gain>=0?'+':''}$${p.gain.toFixed(2)} (${p.gain_pct}%)</td>
+          <td class="right ${dc}">${p.change_pct>=0?'+':''}${p.change_pct}%</td>
+          <td class="right"><button class="sell-text-btn" onclick="quickSellAll('${esc(p.ticker)}')">Sell all</button></td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table>`;
+  }
+
+  function renderTransactions(txns) {
+    const el = document.getElementById('txnContent');
+    if (!txns.length) {
+      el.innerHTML = `<div style="color:var(--text-tertiary);font-size:14px;padding:16px 0">No transactions yet.</div>`;
+      return;
+    }
+    el.innerHTML = `<table class="data-table">
+      <thead><tr>
+        <th>Date</th><th>Action</th><th>Ticker</th><th class="right">Shares</th><th class="right">Price</th><th class="right">Total</th>
+      </tr></thead>
+      <tbody>
+      ${txns.slice(0,50).map(t => `<tr>
+        <td style="color:var(--text-tertiary)">${t.executed_at?.slice(0,16)||''}</td>
+        <td style="font-weight:600;color:${t.action==='buy'?'#1b5e20':'#b71c1c'}">${t.action.toUpperCase()}</td>
+        <td style="font-weight:600">${esc(t.ticker)}</td>
+        <td class="right">${parseFloat(t.shares).toFixed(4)}</td>
+        <td class="right">$${parseFloat(t.price).toFixed(2)}</td>
+        <td class="right">$${parseFloat(t.total).toFixed(2)}</td>
+      </tr>`).join('')}
+      </tbody>
+    </table>`;
+  }
+
+  async function lookupQuote() {
+    const ticker = document.getElementById('tradeTickerInput').value.trim();
+    if (!ticker) return;
+    const res = await fetch(`/api/portfolio/quote?ticker=${encodeURIComponent(ticker)}`);
+    const q = await res.json();
+    const el = document.getElementById('quoteResult');
+    if (q.error) { toast('× ' + q.error); el.classList.remove('visible'); return; }
+    document.getElementById('qTicker').textContent = q.ticker;
+    document.getElementById('qName').textContent = q.name;
+    document.getElementById('qPrice').textContent = '$' + q.price.toFixed(2);
+    const chg = document.getElementById('qChange');
+    chg.textContent = (q.change_pct >= 0 ? '+' : '') + q.change_pct + '%';
+    chg.className = q.change_pct >= 0 ? 'up' : 'down';
+    el.classList.add('visible');
+  }
+
+  async function placeBuy() {
+    const ticker = document.getElementById('tradeTickerInput').value.trim();
+    const amount = parseFloat(document.getElementById('tradeAmount').value);
+    if (!ticker || !amount) { toast('Enter a ticker and amount'); return; }
+    const res = await fetch('/api/portfolio/buy', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ticker, amount_usd: amount})
+    });
+    const data = await res.json();
+    if (res.ok) { toast(`✓ Bought ${data.shares.toFixed(4)} ${data.ticker} @ $${data.price.toFixed(2)}`); loadPortfolio(); }
+    else { toast('× ' + (data.detail || 'Buy failed')); }
+  }
+
+  async function placeSell() {
+    const ticker = document.getElementById('tradeTickerInput').value.trim();
+    const amount = parseFloat(document.getElementById('tradeAmount').value);
+    if (!ticker || !amount) { toast('Enter a ticker and amount'); return; }
+    const res = await fetch('/api/portfolio/sell', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ticker, amount_usd: amount})
+    });
+    const data = await res.json();
+    if (res.ok) { toast(`✓ Sold $${data.total.toFixed(2)} of ${data.ticker}`); loadPortfolio(); }
+    else { toast('× ' + (data.detail || 'Sell failed')); }
+  }
+
+  async function quickSellAll(ticker) {
+    if (!confirm(`Sell entire ${ticker} position?`)) return;
+    const res = await fetch('/api/portfolio/sell', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ticker, shares: 999999})
+    });
+    const data = await res.json();
+    if (res.ok) { toast(`✓ Sold all ${ticker}`); loadPortfolio(); }
+    else { toast('× ' + (data.detail || 'Sell failed')); }
+  }
+
+  // ── Sources ──
+  async function loadSources() {
+    const res = await fetch('/api/sources');
+    allSources = await res.json();
+    renderSources();
+  }
+
+  function filterSources(type, el) {
+    currentFilter = type;
+    document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    renderSources();
+  }
+
+  function renderSources() {
+    const filtered = currentFilter === 'all' ? allSources : allSources.filter(s => s.type === currentFilter);
+    const el = document.getElementById('sourceList');
+    if (!filtered.length) {
+      el.innerHTML = `<div style="padding:20px;text-align:center;color:var(--text-tertiary);font-size:14px">No sources</div>`;
+      return;
+    }
+    const letters = { substack: 'S', twitter: 'X', youtube: 'Y' };
+    el.innerHTML = filtered.map(s => `
+      <div class="source-row">
+        <div class="source-type-dot">${letters[s.type] || '?'}</div>
+        <div class="source-info">
+          <div class="source-row-name">${esc(s.name)}</div>
+          <div class="source-row-handle">${esc(s.handle)}</div>
+        </div>
+        <label class="ios-toggle">
+          <input type="checkbox" ${s.active ? 'checked' : ''} onchange="toggleSource(${s.id}, this.checked)" />
+          <span class="ios-slider"></span>
+        </label>
+        <button class="delete-x" onclick="deleteSource(${s.id})" title="Remove">×</button>
+      </div>`).join('');
+  }
+
+  async function toggleSource(id, active) {
+    await fetch(`/api/sources/${id}`, {
+      method: 'PATCH', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ active })
+    });
+    // Update local state without full reload
+    const s = allSources.find(s => s.id === id);
+    if (s) s.active = active ? 1 : 0;
+  }
+
+  async function deleteSource(id) {
+    if (!confirm('Remove this source?')) return;
+    await fetch(`/api/sources/${id}`, { method: 'DELETE' });
+    await loadSources();
+    toast('Source removed');
+  }
+
+  async function addSource() {
+    const type = document.getElementById('newType').value;
+    const name = document.getElementById('newName').value.trim();
+    const handle = document.getElementById('newHandle').value.trim();
+    const url = document.getElementById('newUrl').value.trim();
+    if (!name || !handle || !url) { toast('Fill in all fields'); return; }
+    await fetch('/api/sources', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ type, name, handle, url })
+    });
+    document.getElementById('newName').value = '';
+    document.getElementById('newHandle').value = '';
+    document.getElementById('newUrl').value = '';
+    await loadSources();
+    toast('✓ Source added');
+  }
+
+  // ── Skeletons ──
+  function skeletonCards(n) {
+    return Array.from({length: n}, () => `
+      <div style="border:1px solid var(--card-border);border-radius:var(--radius);padding:24px;margin-bottom:8px">
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <div class="skeleton" style="height:22px;width:60px;border-radius:100px"></div>
+          <div class="skeleton" style="height:22px;width:50px;border-radius:100px"></div>
+        </div>
+        <div class="skeleton" style="height:4px;margin-bottom:14px"></div>
+        <div class="skeleton" style="height:15px;margin-bottom:6px"></div>
+        <div class="skeleton" style="height:15px;width:80%;margin-bottom:6px"></div>
+        <div class="skeleton" style="height:15px;width:60%"></div>
+      </div>`).join('');
+  }
+
+  function skeletonRows(n) {
+    return `<div style="border:1px solid var(--card-border);border-radius:var(--radius);overflow:hidden">
+      ${Array.from({length: n}, (_, i) => `
+        <div style="display:flex;gap:14px;padding:16px 18px;${i<n-1?'border-bottom:1px solid var(--divider)':''}">
+          <div class="skeleton" style="width:24px;height:24px;border-radius:50%;flex-shrink:0"></div>
+          <div class="skeleton" style="width:100px;height:14px;flex-shrink:0;align-self:center"></div>
+          <div class="skeleton" style="flex:1;height:14px;align-self:center"></div>
+          <div class="skeleton" style="width:60px;height:14px;flex-shrink:0;align-self:center"></div>
+        </div>`).join('')}
+    </div>`;
+  }
+
+  // ── Builder ──
+  let bChartInstance = null;
+  let bCurrentRange = '3m';
+
+  async function loadBuilder() {
+    const [state, chartData, txns] = await Promise.all([
+      fetch('/api/portfolio-b').then(r => r.json()),
+      fetch(`/api/portfolio-b/chart?range=${bCurrentRange}`).then(r => r.json()),
+      fetch('/api/portfolio-b/transactions').then(r => r.json()),
+    ]);
+    bRenderStatStrip(state);
+    bRenderChart(chartData);
+    bRenderPositions(state.positions);
+    bRenderTransactions(txns);
+    await loadBuilderSources();
+    await loadBuilderIdeas();
+  }
+
+  function bRenderStatStrip(s) {
+    const up = s.total_return_pct >= 0;
+    const sign = up ? '+' : '';
+    document.getElementById('b-portfolioStats').innerHTML = `
+      <div class="stat-main">
+        <div class="stat-main-label">Total Value</div>
+        <div class="stat-main-value">$${s.total_value.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+      </div>
+      <div class="stat-secondary">
+        <div class="stat-secondary-label">Return</div>
+        <div class="return-value ${up?'up':'down'}"><span class="${up?'triangle-up':'triangle-down'}"></span>${sign}${s.total_return_pct}%</div>
+      </div>
+      <div class="stat-secondary">
+        <div class="stat-secondary-label">Cash</div>
+        <div class="stat-secondary-value">$${s.cash.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+      </div>
+      <div class="stat-secondary">
+        <div class="stat-secondary-label">Invested</div>
+        <div class="stat-secondary-value">$${s.positions_value.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+      </div>`;
+  }
+
+  function bRenderChart(data) {
+    const ctx = document.getElementById('b-portfolioChart').getContext('2d');
+    if (bChartInstance) bChartInstance.destroy();
+    const isUp = data.values.length < 2 || data.values[data.values.length-1] >= data.values[0];
+    const lineColor = isUp ? '#1b5e20' : '#b71c1c';
+    bChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: data.labels,
+        datasets: [{ data: data.values, borderColor: lineColor,
+          backgroundColor: isUp ? 'rgba(27,94,32,0.05)' : 'rgba(183,28,28,0.05)',
+          borderWidth: 1.5, fill: true, tension: 0.4, pointRadius: 0, pointHoverRadius: 4 }]
+      },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false },
+          tooltip: { callbacks: { label: c => '$'+c.parsed.y.toLocaleString('en-US',{minimumFractionDigits:2}) },
+            displayColors: false, backgroundColor: '#1a1a1a', padding: 10, cornerRadius: 8 }},
+        scales: {
+          x: { grid: { display: false }, border: { display: false }, ticks: { color: '#9b9b9b', maxTicksLimit: 5, font: { size: 11 }, maxRotation: 0 } },
+          y: { grid: { display: false }, border: { display: false }, position: 'right', ticks: { color: '#9b9b9b', font: { size: 11 }, maxTicksLimit: 4, callback: v => '$'+v.toFixed(0) } }
+        }
+      }
+    });
+  }
+
+  function bRenderPositions(positions) {
+    const el = document.getElementById('b-positionsContent');
+    if (!positions.length) { el.innerHTML = `<div style="color:var(--text-tertiary);font-size:14px;padding:16px 0">No open positions.</div>`; return; }
+    el.innerHTML = `<table class="data-table">
+      <thead><tr><th>Ticker</th><th>Shares</th><th>Avg Cost</th><th class="right">Price</th><th class="right">Value</th><th class="right">Gain/Loss</th><th></th></tr></thead>
+      <tbody>${positions.map(p => {
+        const gc = p.gain >= 0 ? 'up' : 'down';
+        return `<tr>
+          <td><strong>${esc(p.ticker)}</strong><br><span style="font-size:12px;color:var(--text-tertiary)">${esc(p.name)}</span></td>
+          <td>${p.shares.toFixed(4)}</td><td>$${p.avg_cost.toFixed(2)}</td>
+          <td class="right">$${p.current_price.toFixed(2)}</td>
+          <td class="right" style="font-weight:600">$${p.market_value.toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+          <td class="right ${gc}">${p.gain>=0?'+':''}$${p.gain.toFixed(2)} (${p.gain_pct}%)</td>
+          <td class="right"><button class="sell-text-btn" onclick="bQuickSellAll('${esc(p.ticker)}')">Sell all</button></td>
+        </tr>`; }).join('')}</tbody></table>`;
+  }
+
+  function bRenderTransactions(txns) {
+    const el = document.getElementById('b-txnContent');
+    if (!txns.length) { el.innerHTML = `<div style="color:var(--text-tertiary);font-size:14px;padding:16px 0">No transactions yet.</div>`; return; }
+    el.innerHTML = `<table class="data-table">
+      <thead><tr><th>Date</th><th>Action</th><th>Ticker</th><th class="right">Shares</th><th class="right">Price</th><th class="right">Total</th></tr></thead>
+      <tbody>${txns.slice(0,20).map(t => `<tr>
+        <td style="color:var(--text-tertiary)">${t.executed_at?.slice(0,16)||''}</td>
+        <td style="font-weight:600;color:${t.action==='buy'?'#1b5e20':'#b71c1c'}">${t.action.toUpperCase()}</td>
+        <td style="font-weight:600">${esc(t.ticker)}</td>
+        <td class="right">${parseFloat(t.shares).toFixed(4)}</td>
+        <td class="right">$${parseFloat(t.price).toFixed(2)}</td>
+        <td class="right">$${parseFloat(t.total).toFixed(2)}</td>
+      </tr>`).join('')}</tbody></table>`;
+  }
+
+  async function bSetRange(range, el) {
+    bCurrentRange = range;
+    document.querySelectorAll('#b-rangePills .range-pill').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+    const chartData = await fetch(`/api/portfolio-b/chart?range=${range}`).then(r => r.json());
+    bRenderChart(chartData);
+  }
+
+  async function bLookupQuote() {
+    const ticker = document.getElementById('b-tradeTickerInput').value.trim();
+    if (!ticker) return;
+    const res = await fetch(`/api/portfolio/quote?ticker=${encodeURIComponent(ticker)}`);
+    const q = await res.json();
+    const el = document.getElementById('b-quoteResult');
+    if (q.error) { toast('× ' + q.error); el.classList.remove('visible'); return; }
+    document.getElementById('b-qTicker').textContent = q.ticker;
+    document.getElementById('b-qName').textContent = q.name;
+    document.getElementById('b-qPrice').textContent = '$' + q.price.toFixed(2);
+    const chg = document.getElementById('b-qChange');
+    chg.textContent = (q.change_pct >= 0 ? '+' : '') + q.change_pct + '%';
+    chg.className = q.change_pct >= 0 ? 'up' : 'down';
+    el.classList.add('visible');
+  }
+
+  async function bPlaceBuy() {
+    const ticker = document.getElementById('b-tradeTickerInput').value.trim();
+    const amount = parseFloat(document.getElementById('b-tradeAmount').value);
+    if (!ticker || !amount) { toast('Enter a ticker and amount'); return; }
+    const res = await fetch('/api/portfolio-b/buy', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ticker, amount_usd: amount}) });
+    const data = await res.json();
+    if (res.ok) { toast(`✓ Bought ${data.shares.toFixed(4)} ${data.ticker} @ $${data.price.toFixed(2)}`); loadBuilder(); }
+    else { toast('× ' + (data.detail || 'Buy failed')); }
+  }
+
+  async function bPlaceSell() {
+    const ticker = document.getElementById('b-tradeTickerInput').value.trim();
+    const amount = parseFloat(document.getElementById('b-tradeAmount').value);
+    if (!ticker || !amount) { toast('Enter a ticker and amount'); return; }
+    const res = await fetch('/api/portfolio-b/sell', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ticker, amount_usd: amount}) });
+    const data = await res.json();
+    if (res.ok) { toast(`✓ Sold $${data.total.toFixed(2)} of ${data.ticker}`); loadBuilder(); }
+    else { toast('× ' + (data.detail || 'Sell failed')); }
+  }
+
+  async function bQuickSellAll(ticker) {
+    if (!confirm(`Sell entire ${ticker} position?`)) return;
+    const res = await fetch('/api/portfolio-b/sell', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ticker, shares: 999999}) });
+    const data = await res.json();
+    if (res.ok) { toast(`✓ Sold all ${ticker}`); loadBuilder(); }
+    else { toast('× ' + (data.detail || 'Sell failed')); }
+  }
+
+  // ── Builder right panel ──
+  async function handlePdfSelect(event) {
+    const files = event.target.files;
+    for (const file of files) {
+      await uploadPdf(file);
+    }
+    event.target.value = '';
+    await loadBuilderSources();
+  }
+
+  async function handlePdfDrop(event) {
+    event.preventDefault();
+    document.getElementById('pdfDropZone').classList.remove('drag-over');
+    const files = event.dataTransfer.files;
+    for (const file of files) {
+      if (file.type === 'application/pdf') await uploadPdf(file);
+    }
+    await loadBuilderSources();
+  }
+
+  async function uploadPdf(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    toast(`Uploading ${file.name}…`);
+    const res = await fetch('/api/builder/upload-pdf', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (res.ok) toast(`✓ Added: ${data.name}`);
+    else toast('× PDF upload failed');
+  }
+
+  async function addYouTubeLink() {
+    const url = document.getElementById('ytLinkInput').value.trim();
+    if (!url) return;
+    toast('Fetching video info…');
+    const res = await fetch('/api/builder/add-youtube', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ url })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      toast(`✓ Added: ${data.name}`);
+      document.getElementById('ytLinkInput').value = '';
+      await loadBuilderSources();
+    } else {
+      toast('× ' + (data.detail || 'Failed'));
+    }
+  }
+
+  async function loadBuilderSources() {
+    const sources = await fetch('/api/builder/sources').then(r => r.json());
+    const section = document.getElementById('builderSourcesSection');
+    const list = document.getElementById('builderSourceList');
+    if (!sources.length) { section.style.display = 'none'; return; }
+    section.style.display = 'block';
+    list.innerHTML = sources.map(s => `
+      <div class="builder-source-row ${s.checked ? '' : 'unchecked'}" id="bsrc-${s.id}">
+        <input type="checkbox" class="builder-checkbox" ${s.checked ? 'checked' : ''}
+          onchange="toggleBuilderSource(${s.id}, this.checked)" />
+        <span class="builder-source-icon">${s.type === 'pdf' ? '📄' : '▶'}</span>
+        <span class="builder-source-name">${esc(s.name)}</span>
+        <button class="builder-source-delete" onclick="deleteBuilderSource(${s.id})">×</button>
+      </div>`).join('');
+  }
+
+  async function toggleBuilderSource(id, checked) {
+    await fetch(`/api/builder/sources/${id}`, {
+      method: 'PATCH', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ checked })
+    });
+    const row = document.getElementById(`bsrc-${id}`);
+    if (row) row.classList.toggle('unchecked', !checked);
+  }
+
+  async function deleteBuilderSource(id) {
+    await fetch(`/api/builder/sources/${id}`, { method: 'DELETE' });
+    await loadBuilderSources();
+  }
+
+  async function clearBuilderSources() {
+    if (!confirm('Remove all sources?')) return;
+    await fetch('/api/builder/sources', { method: 'DELETE' });
+    await loadBuilderSources();
+    toast('Sources cleared');
+  }
+
+  async function runBuilderAnalysis() {
+    const btn = document.getElementById('builderRunBtn');
+    btn.disabled = true;
+    btn.classList.add('running');
+    btn.textContent = 'Analyzing…';
+    try {
+      const res = await fetch('/api/builder/run', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        toast(`✓ Generated ${data.count} idea${data.count !== 1 ? 's' : ''}`);
+        await loadBuilderIdeas();
+      } else {
+        toast('× Analysis failed');
+      }
+    } catch (e) {
+      toast('× Error: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.classList.remove('running');
+      btn.textContent = 'Run Analysis';
+    }
+  }
+
+  async function loadBuilderIdeas() {
+    const ideas = await fetch('/api/builder/ideas').then(r => r.json());
+    const section = document.getElementById('builderIdeasSection');
+    const list = document.getElementById('builderIdeasList');
+    if (!ideas.length) { section.style.display = 'none'; return; }
+    section.style.display = 'block';
+    list.innerHTML = ideas.map((idea, i) => `
+      <div class="idea-row" id="idea-${i}">
+        <div class="idea-header" onclick="toggleIdea(${i})">
+          <span class="idea-chevron">›</span>
+          <span class="idea-title">${esc(idea.title)}</span>
+          <span class="idea-count-badge">${idea.stocks?.length || 0} stocks</span>
+        </div>
+        <div class="idea-body">
+          <div class="idea-thesis">${esc(idea.thesis)}</div>
+          ${(idea.stocks || []).map(s => `
+            <div class="idea-stock-row">
+              <span class="idea-stock-ticker">${esc(s.ticker)}</span>
+              <span class="idea-stock-name">${esc(s.name)}</span>
+              <button class="select-btn" onclick="selectIdeasTicker('${esc(s.ticker)}')">Select →</button>
+            </div>`).join('')}
+        </div>
+      </div>`).join('');
+  }
+
+  function toggleIdea(i) {
+    const row = document.getElementById(`idea-${i}`);
+    row.classList.toggle('open');
+  }
+
+  function selectIdeasTicker(ticker) {
+    // Populate the left panel trade input and trigger lookup
+    document.getElementById('b-tradeTickerInput').value = ticker;
+    bLookupQuote();
+    // Flash the trade section
+    const section = document.getElementById('b-tradeSection');
+    section.classList.remove('trade-flash');
+    void section.offsetWidth; // reflow
+    section.classList.add('trade-flash');
+  }
+
+  // ── Util ──
+  function esc(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Init
+  loadSignals();
+</script>
+</body>
+</html>
