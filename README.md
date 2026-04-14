@@ -7,7 +7,7 @@ A personal investing intelligence tool that monitors the writers, analysts, and 
 - **Signal Analysis** - Fetches content from Substack, YouTube, and X sources you configure, then analyzes each piece through four investor lenses
 - **Paper Trading** - $1,000 starting cash, buy/sell by dollar amount, live prices via Yahoo Finance, portfolio chart with full range selector
 - **Builder** - Upload PDFs or paste YouTube links, check off sources, and generate thematic investment ideas with stock picks powered by Claude
-- **Separate Builder Portfolio** - Independent $1,000 portfolio in the Builder tab to test ideas from your research without affecting your main portfolio
+- **Portfolio** - Independent $1,000 portfolio to test ideas from your research
 
 ## Stack
 
