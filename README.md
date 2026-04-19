@@ -12,7 +12,6 @@ A personal investing intelligence tool that monitors the writers, analysts, and 
 ## Stack
 
 - Backend: FastAPI + SQLite
-- AI: Anthropic Claude (claude-sonnet-4-6)
 - Prices: yfinance
 - Frontend: Vanilla JS + Chart.js
 
